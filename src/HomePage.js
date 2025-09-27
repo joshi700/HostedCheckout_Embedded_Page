@@ -86,14 +86,14 @@ function HomePage() {
       const baseUrl = window.location.origin;
       const returnUrl = `${baseUrl}/receipt`;
       
-      const response = await fetch('http://localhost:3005/', {
+      const response = await fetch('https://hosted-checkout-backend-jo7a.vercel.app/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           returnUrl: returnUrl,
-          amount: '99.99',
+          amount: '99.00',
           orderId: `ORDER_${Date.now()}` // Generate unique order ID
         })
       });
