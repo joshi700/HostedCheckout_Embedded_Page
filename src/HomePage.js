@@ -45,9 +45,9 @@ function HomePage() {
   // Configure checkout when script is loaded and session is available
   useEffect(() => {
     if (isCheckoutReady && window.Checkout && paymentSession) {
-      console.log('Configuring checkout with session:', paymentSession);
-      console.log('Session length:', paymentSession.length);
-      console.log('Session starts with SESSION:', paymentSession.startsWith('SESSION'));
+      console.log('UI Configuring checkout with session:', paymentSession);
+      console.log('UI Session length:', paymentSession.length);
+      console.log('UI Session starts with SESSION:', paymentSession.startsWith('SESSION'));
       
       try {
         // IMPORTANT: Add delay to ensure script is fully ready
@@ -66,7 +66,7 @@ function HomePage() {
           
           console.log('Configuration object:', config);
           window.Checkout.configure(config);
-          console.log('Configuration completed successfully with session:', paymentSession);
+          console.log('UIX Configuration completed successfully with session:', paymentSession);
         }, 100); // Small delay to ensure fresh script state
         
       } catch (configError) {
@@ -97,13 +97,14 @@ function HomePage() {
           orderId: `ORDER_${Date.now()}` // Generate unique order ID
         })
       });
-
+      console.log('Response to UI:', response);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.text();
-      console.log('Session ID received:', data);
+      console.log('Session ID received UCI:', data);
       
       return data;
     } catch (error) {
@@ -118,7 +119,7 @@ function HomePage() {
   const openCheckoutPage = async () => {
     try {
       // STEP 1: Clear all previous state first
-      console.log('Clearing all previous checkout state...');
+      console.log('UI Clearing all previous checkout state...');
       setPaymentSession(null);
       setError(null);
       setIsCheckoutReady(false);
@@ -137,10 +138,10 @@ function HomePage() {
       
       // STEP 5: Get new session ID from API
       const sessionId = await getSessionId();
-      
+      console.log('UIB Setting NEW session ID:', sessionId);
       // STEP 6: Set the new session ID - this will trigger configuration
       const trimmedSessionId = sessionId.trim();
-      console.log('Setting NEW session ID:', trimmedSessionId);
+      console.log('UI Setting NEW session ID:', trimmedSessionId);
       setPaymentSession(trimmedSessionId);
       
       // STEP 7: Wait for configuration to complete, then show embedded payment page
