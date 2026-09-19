@@ -3,6 +3,43 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// Overridable per deployment, so a preview frontend can point at a preview
+// backend. Falls back to the production backend.
+const BACKEND_URL =
+  process.env.REACT_APP_BACKEND_URL || 'https://hosted-checkout-embedded-page-backe.vercel.app/';
+
+const money = (v) => `$${Number(v).toFixed(2)}`;
+
+// In embedded mode Mastercard renders only the payment form, so the order
+// summary is the merchant page's job. It is drawn from the order the backend
+// actually sent to the gateway, so the two can never disagree.
+function OrderSummary({ order }) {
+  return (
+    <aside className="order-summary">
+      <h3>Order summary</h3>
+      <p className="order-id">Order {order.id}</p>
+      <ul className="order-items">
+        {order.item.map((i) => (
+          <li key={i.name}>
+            <div className="order-item-main">
+              <span className="order-item-name">{i.name}</span>
+              <span>{money(Number(i.unitPrice) * Number(i.quantity))}</span>
+            </div>
+            <div className="order-item-meta">
+              {i.description} · Qty {i.quantity}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="order-row"><span>Subtotal</span><span>{money(order.itemAmount)}</span></div>
+      <div className="order-row"><span>Tax</span><span>{money(order.taxAmount)}</span></div>
+      <div className="order-row order-total">
+        <span>Total</span><span>{order.currency} {money(order.amount)}</span>
+      </div>
+    </aside>
+  );
+}
+
 function HomePage() {
   const [paymentSession, setPaymentSession] = useState(null);
   const [isCheckoutReady, setIsCheckoutReady] = useState(false);
@@ -10,6 +47,7 @@ function HomePage() {
   const [error, setError] = useState(null);
   const [scriptKey, setScriptKey] = useState(0); // Force script reload
   const [showEmbeddedCheckout, setShowEmbeddedCheckout] = useState(false);
+  const [order, setOrder] = useState(null);
 
   // Load/reload Mastercard Checkout script - reload for each new session
   useEffect(() => {
@@ -86,10 +124,12 @@ function HomePage() {
       const baseUrl = window.location.origin;
       const returnUrl = `${baseUrl}/receipt`;
       
-      const response = await fetch('https://hosted-checkout-embedded-page-backe.vercel.app/', {
+      const response = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Ask for the order too, so this page can show the summary.
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           returnUrl: returnUrl,
@@ -103,10 +143,13 @@ function HomePage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.text();
-      console.log('Session ID received UCI:', data);
-      
-      return data;
+      // A backend that predates the order summary still answers in plain text;
+      // accept both so this page works against either.
+      if ((response.headers.get('content-type') || '').includes('application/json')) {
+        const data = await response.json();
+        return { sessionId: data.sessionId, order: data.order || null };
+      }
+      return { sessionId: await response.text(), order: null };
     } catch (error) {
       console.error('Error fetching session ID:', error);
       setError('Failed to get session ID. Please try again.');
@@ -137,8 +180,8 @@ function HomePage() {
       await new Promise(resolve => setTimeout(resolve, 200));
       
       // STEP 5: Get new session ID from API
-      const sessionId = await getSessionId();
-      console.log('UIB Setting NEW session ID:', sessionId);
+      const { sessionId, order: sentOrder } = await getSessionId();
+      setOrder(sentOrder);
       // STEP 6: Set the new session ID - this will trigger configuration
       const trimmedSessionId = sessionId.trim();
       console.log('UI Setting NEW session ID:', trimmedSessionId);
@@ -178,6 +221,7 @@ function HomePage() {
   const hideEmbeddedCheckout = () => {
     setShowEmbeddedCheckout(false);
     setPaymentSession(null);
+    setOrder(null);
     setError(null);
   };
 
@@ -256,17 +300,20 @@ function HomePage() {
               </button>
             </div>
             
-            {/* This is where the embedded checkout will be rendered */}
-            <div 
-              id="embed-target" 
-              style={{
-                minHeight: '500px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                backgroundColor: '#fff'
-              }}
-            >
-              {/* Checkout form will be embedded here by Mastercard */}
+            <div className="checkout-layout">
+              {/* This is where the embedded checkout will be rendered */}
+              <div
+                id="embed-target"
+                style={{
+                  minHeight: '500px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  backgroundColor: '#fff'
+                }}
+              >
+                {/* Checkout form will be embedded here by Mastercard */}
+              </div>
+              {order && <OrderSummary order={order} />}
             </div>
           </div>
         )}
